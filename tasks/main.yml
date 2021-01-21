@@ -78,8 +78,8 @@
 
 - name: create database user
   postgresql_user:
-    name: drupaluser
-    password: drupal
+    name: "{{ postgresUser }}"
+    password: "{{ postgresPassword }}"
     encrypted: yes
     role_attr_flags: NOCREATEROLE,NOCREATEDB
   become: true
@@ -87,24 +87,24 @@
 
 - name: create database
   postgresql_db:
-    name: drupal
+    name: "{{ postgresDatabasename }}"
     encoding: UTF-8
-    owner: drupaluser
+    owner: "{{ postgresUser }}"
   become: true
   become_user: postgres
   
 - name: Copy database dump file to VM
   copy:
-    src: ../databasedump.sql
+    src: "../drupalPreset/{{ postgresDatabaseDump }}"
     dest: /tmp
   
 - name: Import database
   become_user: postgres
   shell: 
-    cmd: psql drupal < /tmp/databasedump.sql
+    cmd: psql drupal < "/tmp/{{ postgresDatabaseDump }}"
 
 - name: Check if drupal is installed
-  stat: path=/var/www/html/corona2020.local
+  stat: path="/var/www/html/{{ drupalDirname }}"
   register: drupal_installed
 
 - name: Download Drupal
@@ -124,35 +124,35 @@
   when: not drupal_installed.stat.exists
     
 - name: rename drupal dir
-  command: mv /var/www/html/drupal-8.7.10 /var/www/html/corona2020.local
+  command: mv /var/www/html/drupal-8.7.10 "/var/www/html/{{ drupalDirname }}"
   when: not drupal_installed.stat.exists
   
 - name: copy drupal site to VM
   become: true
   copy:
     src: ../drupalPreset/sites
-    dest: /var/www/html/corona2020.local
+    dest: "/var/www/html/{{ drupalDirname }}"
 
 - name: Check if drupal directory is made
-  stat: path=/var/www/html/corona2020.local/sites/default/files
+  stat: path="/var/www/html/{{ drupalDirname }}/sites/default/files"
   register: drupaldir_installed
 
 - name: make directory files
   become: true
   file:
-    path: /var/www/html/corona2020.local/sites/default/files
+    path: "/var/www/html/{{ drupalDirname }}/sites/default/files"
     state: directory
   when: not drupaldir_installed.stat.exists
  
 - name: Check if drupal settings are made
-  stat: path=/var/www/html/corona2020.local/sites/default/settings.php
+  stat: path="/var/www/html/{{ drupalDirname }}/sites/default/settings.php"
   register: drupalsettings_installed
  
 - name: copy default.settings.php to settings.php
   become: true
   copy:
-    src: /var/www/html/corona2020.local/sites/default/default.settings.php 
-    dest: /var/www/html/corona2020.local/sites/default/settings.php
+    src: "/var/www/html/{{ drupalDirname }}/sites/default/default.settings.php"
+    dest: "/var/www/html/{{ drupalDirname }}/sites/default/settings.php"
     remote_src: yes
   when: not drupalsettings_installed.stat.exists
     
@@ -165,13 +165,13 @@
 - name: Copy certs to VM (1/2)
   become: true
   copy:
-    src: ../certs/ca.crt
+    src: ../certs/{{ crtFile }}
     dest: /etc/pki/nginx
 
 - name: Copy certs to VM (2/2)
   become: true
   copy:
-    src: ../certs/ca.key
+    src: ../certs/{{ keyFile }}
     dest: /etc/pki/nginx/private
     
 - name: Configure drupal.conf
@@ -187,12 +187,12 @@
 - name: Configure settings.php
   template:
     src: "settings.php.j2"
-    dest: "/var/www/html/corona2020.local/sites/default/settings.php"
+    dest: "/var/www/html/{{ drupalDirname }}/sites/default/settings.php"
     
 - name: recursively change ownership of directory drupal
   become: true
   file:
-    path: /var/www/html/corona2020.local
+    path: "/var/www/html/{{ drupalDirname }}"
     recurse: yes
     owner: nginx
     group: nginx
@@ -203,32 +203,32 @@
 - name: fcontext 1/3
   become: true
   sefcontext:
-    target: '/var/www/html/corona2020.local(/.*)?'
+    target: "/var/www/html/{{ drupalDirname }}(/.*)?"
     setype: httpd_sys_rw_content_t
     
 - name: fcontext 2/3
   become: true
   sefcontext:
-    target: '/var/www/html/corona2020.local/sites/default/settings.php'
+    target: "/var/www/html/{{ drupalDirname }}/sites/default/settings.php"
     setype: httpd_sys_rw_content_t
     
 - name: fcontext 3/3
   become: true
   sefcontext:
-    target: '/var/www/html/corona2020.local/sites/default/files'
+    target: "/var/www/html/{{ drupalDirname }}/sites/default/files"
     setype: httpd_sys_rw_content_t
     
 - name: restorecon 1/3
   become: true
-  command: restorecon -Rv /var/www/html/corona2020.local
+  command: restorecon -Rv "/var/www/html/{{ drupalDirname }}"
     
 - name: restorecon 2/3
   become: true
-  command: restorecon -v /var/www/html/corona2020.local/sites/default/settings.php
+  command: restorecon -v "/var/www/html/{{ drupalDirname }}/sites/default/settings.php"
  
 - name: restorecon 3/3
   become: true
-  command: restorecon -Rv /var/www/html/corona2020.local/sites/default/files
+  command: restorecon -Rv "/var/www/html/{{ drupalDirname }}/sites/default/files"
       
 - name: SELinux set httpd_can_network_connect
   become: true
@@ -257,6 +257,7 @@
     service: http
     permanent: yes
     state: enabled
+  when: enableHTTP
         
 - name: firewall add https service
   become: true
@@ -264,4 +265,5 @@
     service: https
     permanent: yes
     state: enabled
+  when: enableHTTPS
   notify: restart firewall

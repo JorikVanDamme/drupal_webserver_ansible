@@ -1,2 +1,12 @@
 ---
-# vars file for pcp-grafana-role
+# vars file for 
+
+postgresUser: drupaluser
+postgresPassword: drupal
+postgresDatabasename: drupal
+postgresDatabaseDump: databasedump.sql
+drupalDirname: corona2020.local
+crtFile: ca.crt
+keyFile: ca.key
+enableHTTP: true
+enableHTTPS: true

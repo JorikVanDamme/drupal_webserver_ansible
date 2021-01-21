@@ -1,2 +1,12 @@
 ---
-# defaults file for pcp-grafana-role
+# defaults file for Drupal_Webserver
+
+postgresUser: drupaluser
+postgresPassword: drupal
+postgresDatabasename: drupal
+postgresDatabaseDump: databasedump.sql
+drupalDirname: corona2020.local
+crtFile: ca.crt
+keyFile: ca.key
+enableHTTP: true
+enableHTTPS: true
