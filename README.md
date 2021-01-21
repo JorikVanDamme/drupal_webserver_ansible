@@ -1,7 +1,13 @@
-Role Name
+Drupal Webserver - Ansible Role
 =========
 
-A brief description of the role goes here.
+A complete, "ready-to-go", drupal website.
+This contains:
+- Drupal frontend
+- Nginx & PHP backend
+- PostgreSql database
+
+This role is built to roll out existing webapplications. It uses already-made database dumps to provision new instances with the correct information and setup to instantly configure and provision a new instance.
 
 Requirements
 ------------
