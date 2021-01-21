@@ -1,0 +1,26 @@
+---
+# handlers file for pcp-grafana-role
+
+- name: restart nginx
+  systemd:
+    name: nginx
+    enabled: yes
+    state: restarted
+
+- name: restart php-fpm
+  systemd:
+    service: php-fpm
+    enabled: yes
+    state: restarted
+
+- name: restart postgresql
+  systemd:
+    service: postgresql.service
+    enabled: yes
+    state: restarted
+
+- name: restart firewall
+  systemd:
+    name: firewalld
+    enabled: yes
+    state: restarted

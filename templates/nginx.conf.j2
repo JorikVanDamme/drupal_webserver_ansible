@@ -1,0 +1,204 @@
+# For more information on configuration, see:
+#   * Official English Documentation: http://nginx.org/en/docs/
+#   * Official Russian Documentation: http://nginx.org/ru/docs/
+
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+    server {
+        listen 80;
+        server_name corona2020.local;
+
+        root /var/www/html/corona2020.local;
+
+        access_log /var/log/nginx/example.com.access.log;
+        error_log /var/log/nginx/example.com.error.log;
+
+        location = /favicon.ico {
+            log_not_found off;
+            access_log off;
+        }
+
+        location = /robots.txt {
+            allow all;
+            log_not_found off;
+            access_log off;
+        }
+
+        location ~ \..*/.*\.php$ {
+            return 403;
+        }
+
+        location ~ ^/sites/.*/private/ {
+            return 403;
+        }
+
+        # Block access to scripts in site files directory
+        location ~ ^/sites/[^/]+/files/.*\.php$ {
+            deny all;
+        }
+        location ~ (^|/)\. {
+            return 403;
+        }
+
+        location / {
+            try_files $uri /index.php?$query_string;
+        }
+
+        location @rewrite {
+            rewrite ^/(.*)$ /index.php?q=$1;
+        }
+        location ~ /vendor/.*\.php$ {
+            deny all;
+            return 404;
+        }
+
+
+        location ~ '\.php$|^/update.php' {
+            fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+            include fastcgi_params;
+       	    # Block httpoxy attacks. See https://httpoxy.org/.
+            fastcgi_param HTTP_PROXY "";
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param PATH_INFO $fastcgi_path_info;
+            fastcgi_param QUERY_STRING $query_string;
+            fastcgi_intercept_errors on;
+            fastcgi_pass unix:/run/php-fpm/drupal.sock;
+        }
+        location ~ ^/sites/.*/files/styles/ { # For Drupal >= 7
+            try_files $uri @rewrite;
+        }
+
+        # Handle private files through Drupal. Private file's path can come
+        # with a language prefix.
+        location ~ ^(/[a-z\-]+)?/system/files/ { # For Drupal >= 7
+            try_files $uri /index.php?$query_string;
+        }
+
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            try_files $uri @rewrite;
+            expires max;
+            log_not_found off;
+        }
+    }
+
+# Settings for a TLS enabled server.
+
+    server {
+        listen       443 ssl http2 default_server;
+        listen       [::]:443 ssl http2 default_server;
+        server_name  corona2020.local;
+        root         /var/www/html/corona2020.local;
+
+        ssl_certificate "/etc/pki/nginx/ca.crt";
+        ssl_certificate_key "/etc/pki/nginx/private/ca.key";
+        ssl_session_cache shared:SSL:1m;
+        ssl_session_timeout  10m;
+        ssl_ciphers PROFILE=SYSTEM;
+        ssl_prefer_server_ciphers on;
+
+        # Load configuration files for the default server block.
+        include /etc/nginx/default.d/*.conf;
+
+        access_log /var/log/nginx/example.com.access.log;
+        error_log /var/log/nginx/example.com.error.log;
+
+        location = /favicon.ico {
+            log_not_found off;
+            access_log off;
+        }
+
+        location = /robots.txt {
+            allow all;
+            log_not_found off;
+            access_log off;
+        }
+
+        location ~ \..*/.*\.php$ {
+            return 403;
+        }
+
+        location ~ ^/sites/.*/private/ {
+            return 403;
+        }
+
+        # Block access to scripts in site files directory
+        location ~ ^/sites/[^/]+/files/.*\.php$ {
+            deny all;
+        }
+        location ~ (^|/)\. {
+            return 403;
+        }
+
+        location / {
+            try_files $uri /index.php?$query_string;
+        }
+
+        location @rewrite {
+            rewrite ^/(.*)$ /index.php?q=$1;
+        }
+        location ~ /vendor/.*\.php$ {
+            deny all;
+            return 404;
+        }
+
+
+        location ~ '\.php$|^/update.php' {
+            fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+            include fastcgi_params;
+       	    # Block httpoxy attacks. See https://httpoxy.org/.
+            fastcgi_param HTTP_PROXY "";
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param PATH_INFO $fastcgi_path_info;
+            fastcgi_param QUERY_STRING $query_string;
+            fastcgi_intercept_errors on;
+            fastcgi_pass unix:/run/php-fpm/drupal.sock;
+        }
+        location ~ ^/sites/.*/files/styles/ { # For Drupal >= 7
+            try_files $uri @rewrite;
+        }
+
+        # Handle private files through Drupal. Private file's path can come
+        # with a language prefix.
+        location ~ ^(/[a-z\-]+)?/system/files/ { # For Drupal >= 7
+            try_files $uri /index.php?$query_string;
+        }
+
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            try_files $uri @rewrite;
+            expires max;
+            log_not_found off;
+        }
+    }
+
+}

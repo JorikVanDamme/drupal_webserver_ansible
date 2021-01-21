@@ -1,0 +1,267 @@
+---
+# tasks file for webserver-role
+- name: install packages
+  become: true
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+      - firewalld
+      - nginx
+      - postgresql-server
+      - php
+      - php-mysqlnd
+      - php-pdo
+      - php-gd
+      - php-mbstring
+      - php-fpm
+      - php-pgsql
+      - php-cli
+      - php-xml
+      - php-curl
+      - php-pdo
+      - php-json
+      - php-opcache
+      - php-pdo_pgsql
+      - policycoreutils-python-utils
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+
+- name: provide /usr/bin/semanage
+  become: true
+  yum:
+    name: /usr/sbin/semanage
+    state: present
+
+- name: Start service nginx
+  become: true
+  service:
+    name: nginx
+    state: started
+
+- name: Start service firewalld
+  become: true
+  service:
+    name: firewalld
+    state: started
+    
+- name: Start service php-fpm
+  become: true
+  service:
+    name: php-fpm
+    state: started
+
+- name: Check if PostgreSQL database is initialized
+  stat:
+    path: "/var/lib/pgsql/data/PG_VERSION"
+  register: pgdata_dir_version
+
+- name: postgresql initdb
+  become: true
+  shell:
+    cmd: postgresql-setup --initdb --unit postgresql
+  when: not pgdata_dir_version.stat.exists
+    
+- name: configuration
+  become: true
+  replace: 
+    dest: /var/lib/pgsql/data/pg_hba.conf
+    regexp: 'ident'
+    replace: 'md5'
+
+- name: Start service postgresql
+  become: true
+  service:
+    name: postgresql
+    state: started
+
+- name: create database user
+  postgresql_user:
+    name: drupaluser
+    password: drupal
+    encrypted: yes
+    role_attr_flags: NOCREATEROLE,NOCREATEDB
+  become: true
+  become_user: postgres
+
+- name: create database
+  postgresql_db:
+    name: drupal
+    encoding: UTF-8
+    owner: drupaluser
+  become: true
+  become_user: postgres
+  
+- name: Copy database dump file to VM
+  copy:
+    src: ../databasedump.sql
+    dest: /tmp
+  
+- name: Import database
+  become_user: postgres
+  shell: 
+    cmd: psql drupal < /tmp/databasedump.sql
+
+- name: Check if drupal is installed
+  stat: path=/var/www/html/corona2020.local
+  register: drupal_installed
+
+- name: Download Drupal
+  become: true
+  get_url:
+    url: https://ftp.drupal.org/files/projects/drupal-8.7.10.tar.gz
+    dest: /tmp
+    mode: '0440'
+  when: not drupal_installed.stat.exists
+    
+- name: Extract drupal-8.7.10.tar.gz into /var/www/html
+  become: true
+  unarchive:
+    src: /tmp/drupal-8.7.10.tar.gz
+    dest: /var/www/html
+    copy: no
+  when: not drupal_installed.stat.exists
+    
+- name: rename drupal dir
+  command: mv /var/www/html/drupal-8.7.10 /var/www/html/corona2020.local
+  when: not drupal_installed.stat.exists
+  
+- name: copy drupal site to VM
+  become: true
+  copy:
+    src: ../drupalPreset/sites
+    dest: /var/www/html/corona2020.local
+
+- name: Check if drupal directory is made
+  stat: path=/var/www/html/corona2020.local/sites/default/files
+  register: drupaldir_installed
+
+- name: make directory files
+  become: true
+  file:
+    path: /var/www/html/corona2020.local/sites/default/files
+    state: directory
+  when: not drupaldir_installed.stat.exists
+ 
+- name: Check if drupal settings are made
+  stat: path=/var/www/html/corona2020.local/sites/default/settings.php
+  register: drupalsettings_installed
+ 
+- name: copy default.settings.php to settings.php
+  become: true
+  copy:
+    src: /var/www/html/corona2020.local/sites/default/default.settings.php 
+    dest: /var/www/html/corona2020.local/sites/default/settings.php
+    remote_src: yes
+  when: not drupalsettings_installed.stat.exists
+    
+- name: Create certs directory
+  become: true
+  file:
+    path: /etc/pki/nginx/private
+    state: directory
+    
+- name: Copy certs to VM (1/2)
+  become: true
+  copy:
+    src: ../certs/ca.crt
+    dest: /etc/pki/nginx
+
+- name: Copy certs to VM (2/2)
+  become: true
+  copy:
+    src: ../certs/ca.key
+    dest: /etc/pki/nginx/private
+    
+- name: Configure drupal.conf
+  template:
+    src: "drupal.conf.j2"
+    dest: "/etc/php-fpm.d/drupal.conf"
+    
+- name: Configure nginx.conf
+  template:
+    src: "nginx.conf.j2"
+    dest: "/etc/nginx/nginx.conf"
+    
+- name: Configure settings.php
+  template:
+    src: "settings.php.j2"
+    dest: "/var/www/html/corona2020.local/sites/default/settings.php"
+    
+- name: recursively change ownership of directory drupal
+  become: true
+  file:
+    path: /var/www/html/corona2020.local
+    recurse: yes
+    owner: nginx
+    group: nginx
+  notify: 
+    - restart nginx
+    - restart php-fpm
+
+- name: fcontext 1/3
+  become: true
+  sefcontext:
+    target: '/var/www/html/corona2020.local(/.*)?'
+    setype: httpd_sys_rw_content_t
+    
+- name: fcontext 2/3
+  become: true
+  sefcontext:
+    target: '/var/www/html/corona2020.local/sites/default/settings.php'
+    setype: httpd_sys_rw_content_t
+    
+- name: fcontext 3/3
+  become: true
+  sefcontext:
+    target: '/var/www/html/corona2020.local/sites/default/files'
+    setype: httpd_sys_rw_content_t
+    
+- name: restorecon 1/3
+  become: true
+  command: restorecon -Rv /var/www/html/corona2020.local
+    
+- name: restorecon 2/3
+  become: true
+  command: restorecon -v /var/www/html/corona2020.local/sites/default/settings.php
+ 
+- name: restorecon 3/3
+  become: true
+  command: restorecon -Rv /var/www/html/corona2020.local/sites/default/files
+      
+- name: SELinux set httpd_can_network_connect
+  become: true
+  seboolean:
+    name: httpd_can_network_connect
+    state: yes
+    persistent: yes
+    
+- name: SELinux set httpd_can_network_connect_db
+  become: true
+  seboolean:
+    name: httpd_can_network_connect_db
+    state: yes
+    persistent: yes
+    
+- name: SELinux set httpd_can_sendmail
+  become: true
+  seboolean:
+    name: httpd_can_sendmail
+    state: yes
+    persistent: yes
+        
+- name: firewall add http service
+  become: true
+  firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+        
+- name: firewall add https service
+  become: true
+  firewalld:
+    service: https
+    permanent: yes
+    state: enabled
+  notify: restart firewall
