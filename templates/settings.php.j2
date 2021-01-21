@@ -778,9 +778,9 @@ $settings['entity_update_backup'] = TRUE;
 #   include $app_root . '/' . $site_path . '/settings.local.php';
 # }
 $databases['default']['default'] = array (
-  'database' => 'drupal',
-  'username' => 'drupaluser',
-  'password' => 'drupal',
+  'database' => '{{ postgresDatabasename }}',
+  'username' => '{{ postgresUser }}',
+  'password' => '{{ postgresPassword }}',
   'prefix' => '',
   'host' => 'localhost',
   'port' => '5432',
