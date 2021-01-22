@@ -8,6 +8,7 @@ This contains:
 - PostgreSql database
 
 This role is built to roll out existing webapplications. It uses already-made database dumps to provision new instances with the correct information and setup to instantly configure and provision a new instance.
+This role can be very usefull when trying to setup a high available cluster of webservers.
 
 Requirements
 ------------
