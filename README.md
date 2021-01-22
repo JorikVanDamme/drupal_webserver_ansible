@@ -22,7 +22,7 @@ How to use
 
 Once a drupal website has been made, this role can be used to roll out the website to different instances, using Nginx & PHP.
 First of all, copy the "sites" directory (drupal) into the "drupalPreset" folder, within the role's directory.
-After that, a database dump should be made, and copied into the role's "drupalPreset" directory. (for more info on how to do this, follow these guidelines: https://www.postgresql.org/docs/9.1/backup-dump.html
+After that, a database dump should be made, and copied into the role's "drupalPreset" directory. (for more info on how to do this, follow these guidelines: [SQL Dump](https://www.postgresql.org/docs/9.1/backup-dump.html)
 If you wish to use HTTPS instead of HTTP (or both), a certificate and key should be placed in the "certs" folder, within the role's directory.
 
 After completing the playbook and configuring the variables, ansible can run the playbook and setup your drupal website with minimal effort.
