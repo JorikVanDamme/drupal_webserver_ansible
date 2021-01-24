@@ -52,7 +52,7 @@ Example Playbook
 
     - hosts: webservers
       roles:
-         - { role: jorikvandamme.drupal_webserver_ansible, x: 42 }
+         - jorikvandamme.drupal_webserver_ansible
 
 License
 -------
